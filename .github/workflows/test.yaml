@@ -65,6 +65,10 @@ jobs:
           command: check
           args: --all --bins --examples --tests -vvv
 
+      - name: Cargo test
+        uses: actions-rs/cargo@v1
+        run: cargo test
+
       - name: Unit tests
         run: |
           yarn build:test

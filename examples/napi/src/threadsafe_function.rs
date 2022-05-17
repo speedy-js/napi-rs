@@ -8,6 +8,10 @@ use napi::{
   JsBoolean, JsString, JsUndefined,
   threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode},
   JsBoolean, JsString,
+  threadsafe_function::{
+    ErrorStrategy, ThreadSafeResultContext, ThreadsafeFunction, ThreadsafeFunctionCallMode,
+  },
+  JsBoolean, JsUndefined,
 };
 
 #[napi]

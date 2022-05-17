@@ -8,7 +8,7 @@ use std::os::raw::{c_char, c_void};
 use std::ptr;
 
 #[cfg(all(feature = "napi4"))]
-use crate::bindgen_runtime::ToNapiValue;
+use crate::bindgen_runtime::{FromNapiValue, ToNapiValue};
 use crate::{
   async_work::{self, AsyncWorkPromise},
   check_status,
@@ -25,7 +25,9 @@ use crate::cleanup_env::{CleanupEnvHook, CleanupEnvHookData};
 #[cfg(all(feature = "serde-json"))]
 use crate::js_values::{De, Ser};
 #[cfg(feature = "napi4")]
-use crate::threadsafe_function::{ThreadSafeCallContext, ThreadsafeFunction};
+use crate::threadsafe_function::{
+  ThreadSafeCallContext, ThreadSafeResultContext, ThreadsafeFunction,
+};
 #[cfg(feature = "napi3")]
 use crate::JsError;
 #[cfg(all(feature = "serde-json"))]
@@ -1071,13 +1073,22 @@ impl Env {
     T: Send,
     V: ToNapiValue,
     R: 'static + Send + FnMut(ThreadSafeCallContext<T>) -> Result<Vec<V>>,
+    RE: FromNapiValue,
+    RECB: 'static + Send + FnMut(ThreadSafeResultContext<RE>),
   >(
     &self,
     func: &JsFunction,
     max_queue_size: usize,
     callback: R,
+    result_callback: RECB,
   ) -> Result<ThreadsafeFunction<T>> {
-    ThreadsafeFunction::create(self.0, func.0.value, max_queue_size, callback)
+    ThreadsafeFunction::create(
+      self.0,
+      func.0.value,
+      max_queue_size,
+      callback,
+      result_callback,
+    )
   }
 
   #[cfg(all(feature = "tokio_rt", feature = "napi4"))]

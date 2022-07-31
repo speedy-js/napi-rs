@@ -26,6 +26,7 @@ pub struct ThreadSafeResultContext<T: FromNapiValue> {
 }
 
 #[repr(u8)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ThreadsafeFunctionCallMode {
   NonBlocking,
   Blocking,

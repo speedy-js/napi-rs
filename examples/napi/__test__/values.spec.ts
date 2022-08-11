@@ -106,6 +106,8 @@ import {
   AnotherClassForEither,
   receiveDifferentClass,
   useTokioWithoutAsync,
+  getNumArr,
+  getNestedNumArr,
 } from '../'
 
 test('export const', (t) => {
@@ -145,6 +147,8 @@ test('array', (t) => {
   t.deepEqual(getWords(), ['foo', 'bar'])
 
   t.is(sumNums([1, 2, 3, 4, 5]), 15)
+  t.deepEqual(getNumArr(), [1, 2])
+  t.deepEqual(getNestedNumArr(), [[[1]], [[1]]])
 })
 
 test('map', (t) => {

@@ -285,6 +285,9 @@ export class NotWritableClass {
   constructor(name: string)
   setName(name: string): void
 }
+export class CustomFinalize {
+  constructor(width: number, height: number)
+}
 export class ClassWithFactory {
   name: string
   static withName(name: string): ClassWithFactory

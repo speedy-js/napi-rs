@@ -108,6 +108,7 @@ import {
   useTokioWithoutAsync,
   getNumArr,
   getNestedNumArr,
+  CustomFinalize,
 } from '../'
 
 test('export const', (t) => {
@@ -240,6 +241,10 @@ test('class in object field', (t) => {
   const obj = createObjectWithClassField()
   t.is(obj.bird.name, 'Carolyn')
   t.is(receiveObjectWithClassField(obj), obj.bird)
+})
+
+test('custom finalize class', (t) => {
+  t.notThrows(() => new CustomFinalize(200, 200))
 })
 
 test('should be able to create object reference and shared reference', (t) => {

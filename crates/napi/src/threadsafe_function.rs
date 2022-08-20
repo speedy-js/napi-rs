@@ -239,6 +239,8 @@ impl<T: 'static, ES: ErrorStrategy::T> ThreadsafeFunction<T, ES> {
         ptr,
         Some(thread_finalize_cb::<T, V, R>),
         aborted_ptr as *mut c_void,
+        Some(thread_finalize_cb::<T, V, R>),
+        ptr,
         Some(call_js_cb::<T, V, R, ES>),
         &mut raw_tsfn,
       )
@@ -392,6 +394,8 @@ unsafe extern "C" fn thread_finalize_cb<T: 'static, V: ToNapiValue, R>(
   aborted.store(true, Ordering::SeqCst);
   drop(unsafe { Box::<R>::from_raw(finalize_data.cast()) });
   let aborted = unsafe { Arc::<Mutex<bool>>::from_raw(finalize_hint.cast()) };
+  drop(unsafe { Box::<R>::from_raw(finalize_hint.cast()) });
+  let aborted = unsafe { Arc::<Mutex<bool>>::from_raw(finalize_data.cast()) };
   let mut is_aborted = aborted.lock().unwrap();
   *is_aborted = true;
 }

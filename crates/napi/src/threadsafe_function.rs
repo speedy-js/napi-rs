@@ -369,8 +369,8 @@ unsafe extern "C" fn thread_finalize_cb<T: 'static, V: ToNapiValue, R>(
   R: 'static + Send + FnMut(ThreadSafeCallContext<T>) -> Result<Vec<V>>,
 {
   // cleanup
-  drop(unsafe { Box::<R>::from_raw(finalize_data.cast()) });
-  let aborted = unsafe { Arc::<Mutex<bool>>::from_raw(finalize_hint.cast()) };
+  drop(unsafe { Box::<R>::from_raw(finalize_hint.cast()) });
+  let aborted = unsafe { Arc::<Mutex<bool>>::from_raw(finalize_data.cast()) };
   let mut is_aborted = aborted.lock().unwrap();
   *is_aborted = true;
 }

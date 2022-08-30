@@ -2,12 +2,10 @@ use std::thread;
 
 use napi::{
   bindgen_prelude::*,
-  threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode},
-  JsBoolean, JsString,
   threadsafe_function::{
     ErrorStrategy, ThreadSafeResultContext, ThreadsafeFunction, ThreadsafeFunctionCallMode,
   },
-  JsBoolean, JsUndefined,
+  JsBoolean, JsString, JsUndefined,
 };
 
 #[napi]
@@ -82,10 +80,14 @@ pub fn threadsafe_function_fatal_mode_error(cb: JsFunction) -> Result<()> {
 fn threadsafe_function_closure_capture(func: JsFunction) -> napi::Result<()> {
   let str = "test";
   let tsfn: ThreadsafeFunction<()> = func
-    .create_threadsafe_function(0, move |_| {
-      println!("{}", str); // str is NULL at this point
-      Ok(Vec::<JsString>::new())
-    })
+    .create_threadsafe_function(
+      0,
+      move |_| {
+        println!("{}", str); // str is NULL at this point
+        Ok(Vec::<JsString>::new())
+      },
+      |_: ThreadSafeResultContext<JsUndefined>| (),
+    )
     .unwrap();
 
   tsfn.call(Ok(()), ThreadsafeFunctionCallMode::NonBlocking);

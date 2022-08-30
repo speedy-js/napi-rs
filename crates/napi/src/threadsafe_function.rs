@@ -213,7 +213,6 @@ impl<T: 'static, ES: ErrorStrategy::T> ThreadsafeFunction<T, ES> {
 
     let initial_thread_count = 1usize;
     let mut raw_tsfn = ptr::null_mut();
-    let ptr = Box::into_raw(Box::new(callback)) as *mut c_void;
     let aborted = Arc::new(Mutex::new(false));
     let aborted_ptr = Arc::into_raw(aborted.clone());
     let callback_ptr = Box::into_raw(Box::new(callback)) as *mut c_void;
@@ -229,8 +228,6 @@ impl<T: 'static, ES: ErrorStrategy::T> ThreadsafeFunction<T, ES> {
         async_resource_name,
         max_queue_size,
         initial_thread_count,
-        callback_ptr,
-        Some(thread_finalize_cb::<T, V, R>),
         aborted_ptr as *mut c_void,
         Some(thread_finalize_cb::<T, V, R>),
         ptr,
@@ -380,8 +377,6 @@ unsafe extern "C" fn thread_finalize_cb<T: 'static, V: ToNapiValue, R>(
   *is_aborted = true;
 }
 
-pub(crate) static THREAD_SAFE_CALL_JS_CB_ID: AtomicUsize = AtomicUsize::new(0);
-
 unsafe extern "C" fn call_js_cb<T: 'static, V: ToNapiValue, R, RE, ES, RECB>(
   raw_env: sys::napi_env,
   js_callback: sys::napi_value,
@@ -397,7 +392,6 @@ unsafe extern "C" fn call_js_cb<T: 'static, V: ToNapiValue, R, RE, ES, RECB>(
   if raw_env.is_null() || js_callback.is_null() {
     return;
   }
-  THREAD_SAFE_CALL_JS_CB_ID.fetch_add(1, Ordering::SeqCst);
 
   let ctx = unsafe { &mut *context.cast::<[sys::napi_value; 2]>() };
   let native_passed_cb: &mut R = unsafe { &mut *ctx[0].cast::<R>() };

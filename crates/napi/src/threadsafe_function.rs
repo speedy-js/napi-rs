@@ -207,8 +207,11 @@ impl<T: 'static, ES: ErrorStrategy::T> ThreadsafeFunction<T, ES> {
     let mut raw_tsfn = ptr::null_mut();
     let callback_ptr = Box::into_raw(Box::new(callback)) as *mut c_void;
     let result_callback_ptr = Box::into_raw(Box::new(result_callback)) as *mut c_void;
-
     let mut call_js_cb_context = [callback_ptr, result_callback_ptr];
+
+    let aborted = Arc::new(AtomicBool::new(false));
+    let aborted_ptr = Arc::into_raw(aborted.clone()) as *mut c_void;
+    check_status!(unsafe { sys::napi_add_env_cleanup_hook(env, Some(cleanup_cb), aborted_ptr) })?;
 
     check_status!(unsafe {
       sys::napi_create_threadsafe_function(
@@ -218,17 +221,13 @@ impl<T: 'static, ES: ErrorStrategy::T> ThreadsafeFunction<T, ES> {
         async_resource_name,
         max_queue_size,
         initial_thread_count,
-        callback_ptr,
-        Some(thread_finalize_cb::<T, V, R>),
+        aborted_ptr,
+        Some(thread_finalize_cb::<T, V, R, RE, RECB>),
         call_js_cb_context.as_mut_ptr() as *mut _,
         Some(call_js_cb::<T, V, R, RE, ES, RECB>),
         &mut raw_tsfn,
       )
     })?;
-
-    let aborted = Arc::new(AtomicBool::new(false));
-    let aborted_ptr = Arc::into_raw(aborted.clone()) as *mut c_void;
-    check_status!(unsafe { sys::napi_add_env_cleanup_hook(env, Some(cleanup_cb), aborted_ptr) })?;
 
     Ok(ThreadsafeFunction {
       raw_tsfn,
@@ -345,18 +344,22 @@ unsafe extern "C" fn cleanup_cb(cleanup_data: *mut c_void) {
   aborted.store(true, Ordering::SeqCst);
 }
 
-unsafe extern "C" fn thread_finalize_cb<T: 'static, V: ToNapiValue, R>(
+unsafe extern "C" fn thread_finalize_cb<T: 'static, V: ToNapiValue, R, RE, RECB>(
   _raw_env: sys::napi_env,
   finalize_data: *mut c_void,
-  _finalize_hint: *mut c_void,
+  finalize_hint: *mut c_void,
 ) where
   R: 'static + Send + FnMut(ThreadSafeCallContext<T>) -> Result<Vec<V>>,
+  RE: FromNapiValue,
+  RECB: 'static + Send + FnMut(ThreadSafeResultContext<RE>),
 {
   // cleanup
-  drop(unsafe { Box::<R>::from_raw(finalize_data.cast()) });
+  let finalize_hint = unsafe { *finalize_hint.cast::<[sys::napi_value; 2]>() };
+  drop(unsafe { Box::<R>::from_raw(finalize_hint[0].cast()) });
+  drop(unsafe { Box::<RECB>::from_raw(finalize_hint[1].cast()) });
+  let aborted = unsafe { Arc::<AtomicBool>::from_raw(finalize_data.cast()) };
+  aborted.store(true, Ordering::SeqCst);
 }
-
-pub(crate) static THREAD_SAFE_CALL_JS_CB_ID: AtomicUsize = AtomicUsize::new(0);
 
 unsafe extern "C" fn call_js_cb<T: 'static, V: ToNapiValue, R, RE, ES, RECB>(
   raw_env: sys::napi_env,
@@ -373,7 +376,6 @@ unsafe extern "C" fn call_js_cb<T: 'static, V: ToNapiValue, R, RE, ES, RECB>(
   if raw_env.is_null() || js_callback.is_null() {
     return;
   }
-  THREAD_SAFE_CALL_JS_CB_ID.fetch_add(1, Ordering::SeqCst);
 
   let ctx = unsafe { &mut *context.cast::<[sys::napi_value; 2]>() };
   let native_passed_cb: &mut R = unsafe { &mut *ctx[0].cast::<R>() };

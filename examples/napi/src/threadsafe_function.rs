@@ -11,7 +11,7 @@ use napi::{
   threadsafe_function::{
     ErrorStrategy, ThreadSafeResultContext, ThreadsafeFunction, ThreadsafeFunctionCallMode,
   },
-  JsBoolean, JsUndefined,
+  JsBoolean, JsString, JsUndefined,
 };
 
 #[napi]
@@ -98,6 +98,14 @@ fn threadsafe_function_closure_capture(func: JsFunction) -> napi::Result<()> {
       println!("{}", str); // str is NULL at this point
       Ok(Vec::<JsString>::new())
     })
+    .create_threadsafe_function(
+      0,
+      move |_| {
+        println!("{}", str); // str is NULL at this point
+        Ok(Vec::<JsString>::new())
+      },
+      |_: ThreadSafeResultContext<JsUndefined>| (),
+    )
     .unwrap();
 
   tsfn.call(Ok(()), ThreadsafeFunctionCallMode::NonBlocking);

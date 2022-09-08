@@ -5,7 +5,7 @@ use napi::{
   threadsafe_function::{
     ErrorStrategy, ThreadSafeResultContext, ThreadsafeFunction, ThreadsafeFunctionCallMode,
   },
-  JsBoolean, JsUndefined,
+  JsBoolean, JsString, JsUndefined,
 };
 
 #[napi]
@@ -73,5 +73,24 @@ pub fn threadsafe_function_fatal_mode_error(cb: JsFunction) -> Result<()> {
   thread::spawn(move || {
     tsfn.call(true, ThreadsafeFunctionCallMode::Blocking);
   });
+  Ok(())
+}
+
+#[napi]
+fn threadsafe_function_closure_capture(func: JsFunction) -> napi::Result<()> {
+  let str = "test";
+  let tsfn: ThreadsafeFunction<()> = func
+    .create_threadsafe_function(
+      0,
+      move |_| {
+        println!("{}", str); // str is NULL at this point
+        Ok(Vec::<JsString>::new())
+      },
+      |_: ThreadSafeResultContext<JsUndefined>| (),
+    )
+    .unwrap();
+
+  tsfn.call(Ok(()), ThreadsafeFunctionCallMode::NonBlocking);
+
   Ok(())
 }

@@ -4,8 +4,8 @@ use super::Value;
 use crate::bindgen_runtime::TypeName;
 #[cfg(feature = "napi4")]
 use crate::{
-  bindgen_runtime::ToNapiValue,
-  threadsafe_function::{ThreadSafeCallContext, ThreadsafeFunction},
+  bindgen_runtime::{FromNapiValue, ToNapiValue},
+  threadsafe_function::{ThreadSafeCallContext, ThreadSafeResultContext, ThreadsafeFunction},
 };
 use crate::{check_status, ValueType};
 use crate::{sys, Env, Error, JsObject, JsUnknown, NapiRaw, NapiValue, Result, Status};
@@ -123,17 +123,26 @@ impl JsFunction {
   }
 
   #[cfg(feature = "napi4")]
-  pub fn create_threadsafe_function<T, V, F, ES>(
+  pub fn create_threadsafe_function<T, V, F, RE, ES, RECB>(
     &self,
     max_queue_size: usize,
     callback: F,
+    result_callback: RECB,
   ) -> Result<ThreadsafeFunction<T, ES>>
   where
     T: 'static,
     V: ToNapiValue,
     F: 'static + Send + FnMut(ThreadSafeCallContext<T>) -> Result<Vec<V>>,
+    RE: FromNapiValue,
+    RECB: 'static + Send + FnMut(ThreadSafeResultContext<RE>),
     ES: crate::threadsafe_function::ErrorStrategy::T,
   {
-    ThreadsafeFunction::create(self.0.env, self.0.value, max_queue_size, callback)
+    ThreadsafeFunction::create(
+      self.0.env,
+      self.0.value,
+      max_queue_size,
+      callback,
+      result_callback,
+    )
   }
 }

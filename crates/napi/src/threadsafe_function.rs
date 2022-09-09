@@ -216,9 +216,11 @@ impl<T: 'static, ES: ErrorStrategy::T> ThreadsafeFunction<T, ES> {
 
     let aborted = Arc::new(Mutex::new(false));
     let aborted_ptr = Arc::into_raw(aborted.clone()) as *mut c_void;
+
     let callback_ptr = Box::into_raw(Box::new(callback)) as *mut c_void;
     let result_callback_ptr = Box::into_raw(Box::new(result_callback)) as *mut c_void;
-    let mut call_js_cb_context = [callback_ptr, result_callback_ptr];
+    let call_js_cb_context =
+      Box::into_raw(Box::new([callback_ptr, result_callback_ptr])) as *mut c_void;
 
     check_status!(unsafe {
       sys::napi_create_threadsafe_function(
@@ -230,7 +232,7 @@ impl<T: 'static, ES: ErrorStrategy::T> ThreadsafeFunction<T, ES> {
         initial_thread_count,
         aborted_ptr,
         Some(thread_finalize_cb::<T, V, R, RE, RECB>),
-        call_js_cb_context.as_mut_ptr() as *mut _,
+        call_js_cb_context,
         Some(call_js_cb::<T, V, R, RE, ES, RECB>),
         &mut raw_tsfn,
       )
@@ -371,9 +373,9 @@ unsafe extern "C" fn thread_finalize_cb<T: 'static, V: ToNapiValue, R, RE, RECB>
   RECB: 'static + Send + FnMut(ThreadSafeResultContext<RE>),
 {
   // cleanup
-  let finalize_hint = unsafe { *finalize_hint.cast::<[sys::napi_value; 2]>() };
-  drop(unsafe { Box::<R>::from_raw(finalize_hint[0].cast()) });
-  drop(unsafe { Box::<RECB>::from_raw(finalize_hint[1].cast()) });
+  // let finalize_hint = unsafe { Box::<[sys::napi_value; 2]>::from_raw(finalize_hint.cast()) };
+  // drop(unsafe { Box::<R>::from_raw(finalize_hint[0].cast()) });
+  // drop(unsafe { Box::<RECB>::from_raw(finalize_hint[1].cast()) });
   let aborted = unsafe { Arc::<Mutex<bool>>::from_raw(finalize_data.cast()) };
   let mut is_aborted = aborted.lock().unwrap();
   *is_aborted = true;
@@ -395,9 +397,9 @@ unsafe extern "C" fn call_js_cb<T: 'static, V: ToNapiValue, R, RE, ES, RECB>(
     return;
   }
 
-  let ctx = unsafe { &mut *context.cast::<[sys::napi_value; 2]>() };
-  let native_passed_cb: &mut R = unsafe { &mut *ctx[0].cast::<R>() };
-  let native_result_cb: &mut RECB = unsafe { &mut *ctx[1].cast::<RECB>() };
+  let ctx = unsafe { &*Box::<[sys::napi_value; 2]>::from_raw(context.cast()) };
+  let native_passed_cb = unsafe { &mut *Box::<R>::from_raw(ctx[0].cast()) };
+  let native_result_cb = unsafe { &mut *Box::<RECB>::from_raw(ctx[1].cast()) };
 
   let mut return_value = ptr::null_mut();
 

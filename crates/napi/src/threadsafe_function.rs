@@ -217,10 +217,9 @@ impl<T: 'static, ES: ErrorStrategy::T> ThreadsafeFunction<T, ES> {
     let aborted = Arc::new(Mutex::new(false));
     let aborted_ptr = Arc::into_raw(aborted.clone()) as *mut c_void;
 
-    let callback_ptr = Box::into_raw(Box::new(callback)) as *mut c_void;
-    let result_callback_ptr = Box::into_raw(Box::new(result_callback)) as *mut c_void;
-    let call_js_cb_context =
-      Box::into_raw(Box::new([callback_ptr, result_callback_ptr])) as *mut c_void;
+    // let callback_ptr = Box::into_raw(Box::new(callback)) as *mut c_void;
+    // let result_callback_ptr = Box::into_raw(Box::new(result_callback)) as *mut c_void;
+    let call_js_cb_context = Box::into_raw(Box::new((callback, result_callback))) as *mut c_void;
 
     check_status!(unsafe {
       sys::napi_create_threadsafe_function(
@@ -397,9 +396,14 @@ unsafe extern "C" fn call_js_cb<T: 'static, V: ToNapiValue, R, RE, ES, RECB>(
     return;
   }
 
-  let ctx = unsafe { &*Box::<[sys::napi_value; 2]>::from_raw(context.cast()) };
-  let native_passed_cb = unsafe { &mut *Box::<R>::from_raw(ctx[0].cast()) };
-  let native_result_cb = unsafe { &mut *Box::<RECB>::from_raw(ctx[1].cast()) };
+  // let ctx = unsafe { &*Box::<[sys::napi_value; 2]>::from_raw(context.cast()) };
+  // let native_passed_cb = unsafe { &mut *Box::<R>::from_raw(ctx[0].cast()) };
+  // let native_result_cb = unsafe { &mut *Box::<RECB>::from_raw(ctx[1].cast()) };
+
+  let (native_passed_cb, native_result_cb) =
+    unsafe { &mut *Box::<(R, RECB)>::from_raw(context.cast()) };
+  // let native_passed_cb = unsafe { &mut *Box::<R>::from_raw(ctx[0].cast()) };
+  // let native_result_cb = unsafe { &mut *Box::<RECB>::from_raw(ctx[1].cast()) };
 
   let mut return_value = ptr::null_mut();
 
